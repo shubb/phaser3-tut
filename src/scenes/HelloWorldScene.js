@@ -1,4 +1,8 @@
+
+/*https://blog.ourcade.co/posts/2020/make-first-phaser-3-game-modern-javascript-part5/*/
+
 import Phaser from 'phaser'
+import BombSpawner from './BombSpawner'
 
 const GROUND_KEY = 'ground'
 const DUDE_KEY = 'dude'
@@ -13,6 +17,11 @@ export default class HelloWorldScene extends Phaser.Scene
         
         this.player = undefined
         this.cursors = undefined
+        this.bombSpawner = undefined
+        this.bombsGroup = undefined
+        this.stars = undefined
+
+		this.gameOver = false
 
         this.speed = 0
 	}
@@ -36,12 +45,15 @@ export default class HelloWorldScene extends Phaser.Scene
 
         const platforms = this.createPlatforms()
         this.player = this.createPlayer()
-        const stars = this.createStars()
+        this.stars = this.createStars()
+
+        this.bombSpawner = new BombSpawner(this, BOMB_KEY)
+        this.bombsGroup = this.bombSpawner.group
         
         this.physics.add.collider(this.player, platforms)
-        this.physics.add.collider(stars, platforms)
-        
-        this.physics.add.overlap(this.player, stars, this.collectStar, null, this)
+        this.physics.add.collider(this.stars, platforms)
+        this.physics.add.collider(this.player, this.bombsGroup, this.hitBomb, null, this)        
+        this.physics.add.overlap(this.player, this.stars, this.collectStar, null, this)
 
         this.cursors = this.input.keyboard.createCursorKeys()
     }
@@ -49,7 +61,27 @@ export default class HelloWorldScene extends Phaser.Scene
     collectStar(player, star)
     {
         star.disableBody(true, true)
+
+        if (this.stars.countActive(true) === 0)
+        {
+            this.stars.children.iterate((child) => {
+                child.enableBody(true, child.x, 0, true, true)
+            })
+        }
+
+        this.bombSpawner.spawn(player.x)
     }
+
+    hitBomb(player, bomb)
+	{
+		this.physics.pause()
+
+		player.setTint(0xff0000)
+
+		player.anims.play('turn')
+
+		this.gameOver = true
+	}
 
     createPlatforms()
     {
@@ -110,6 +142,12 @@ export default class HelloWorldScene extends Phaser.Scene
 
     update()
     {
+        if (this.gameOver)
+		{
+			return
+		}
+
+
         if(this.cursors.left.isDown)
         {
             this.speed = Math.min(-30, this.speed - 10)
